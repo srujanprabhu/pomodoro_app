@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pomodoro • Tomato Timer</title>
+    <meta name="description" content="Professional tomato-themed Pomodoro timer with tasks, stats, and PWA support.">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon-192.png" sizes="192x192">
+    <meta name="theme-color" content="#ff3b30">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="topbar" role="banner">
+        <div class="brand" aria-label="Tomato Pomodoro">
+            <span class="title">Tomato Pomodoro</span>
+        </div>
+        <nav class="actions" aria-label="Primary">
+            <button id="focusModeBtn" class="ghost" title="Toggle Focus Mode" aria-pressed="false">Focus</button>
+            <button id="themeToggle" class="ghost" title="Toggle Dark/Light" aria-pressed="false">🌗</button>
+            <button id="openSettings" class="ghost" title="Open Settings" aria-haspopup="dialog">Settings</button>
+        </nav>
+    </header>
+
+    <main class="layout" role="main">
+        <section class="timer-panel">
+            <div class="tomato-wrap" id="tomatoContainer">
+                <!-- Clean circular glossy tomato; colors controlled by CSS variables -->
+                <svg id="tomatoSvg" viewBox="0 0 360 360" class="tomato" role="img" aria-label="Timer visual">
+                    <defs>
+                        <radialGradient id="tomatoGradient" cx="40%" cy="30%" r="70%">
+                            <stop offset="0%" stop-color="var(--tomato-highlight)"/>
+                            <stop offset="70%" stop-color="var(--tomato-base)"/>
+                            <stop offset="100%" stop-color="var(--tomato-shadow)"/>
+                        </radialGradient>
+                        <linearGradient id="gloss" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stop-color="#fff" stop-opacity="0.45"/>
+                            <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+                        </linearGradient>
+                        <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feOffset dy="2"/>
+                            <feGaussianBlur stdDeviation="3" result="blur"/>
+                            <feComposite in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowDiff"/>
+                            <feFlood flood-color="#000" flood-opacity="0.25"/>
+                            <feComposite in2="shadowDiff" operator="in"/>
+                            <feComposite in2="SourceGraphic" operator="over"/>
+                        </filter>
+                    </defs>
+                    <!-- Body -->
+                    <circle cx="180" cy="200" r="140" fill="url(#tomatoGradient)" filter="url(#innerShadow)"/>
+                    <!-- Gloss highlight -->
+                    <path d="M90 135c30-25 70-40 110-35 12 1 22 5 32 10-35-5-70 4-97 20-9 6-19 13-27 22-10 10-24-2-18-17z" fill="url(#gloss)"/>
+                    <!-- Progress ring -->
+                    <circle id="progressRing" cx="180" cy="200" r="120" fill="none" stroke="var(--progress)" stroke-width="10" stroke-linecap="round" stroke-dasharray="0 1000"/>
+                </svg>
+                <div class="time-readout" aria-live="polite" aria-atomic="true">
+                    <div class="mode" id="modeLabel">Work</div>
+                    <div class="time" id="timeLabel">25:00</div>
+                </div>
+            </div>
+
+            <div class="controls" role="group" aria-label="Timer controls">
+                <button id="startBtn" class="primary" aria-keyshortcuts="Space" title="Start (Space)">Start</button>
+                <button id="pauseBtn" class="secondary" title="Pause">Pause</button>
+                <button id="resetBtn" class="ghost" title="Reset">Reset</button>
+                <button id="skipBtn" class="ghost" title="Skip">Skip</button>
+            </div>
+
+            <div class="meta">
+                <div><span id="sessionCounter">0</span> pomodoros</div>
+                <div class="volume">
+                    <button id="muteBtn" class="ghost" aria-pressed="false" title="Mute">🔇</button>
+                    <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="0.6" aria-label="Volume">
+                </div>
+            </div>
+        </section>
+
+        <aside class="sidebar">
+            <section class="tasks">
+                <header>
+                    <h2>Tasks</h2>
+                    <div class="task-actions">
+                        <button id="exportBtn" class="ghost" title="Export data">Export</button>
+                        <label class="import-label ghost" title="Import data">
+                            Import
+                            <input id="importInput" type="file" accept="application/json" hidden>
+                        </label>
+                    </div>
+                </header>
+                <form id="taskForm" aria-label="Add task">
+                    <input id="taskTitle" type="text" placeholder="New task" required aria-label="Task title">
+                    <input id="taskEst" type="number" min="1" max="20" value="1" aria-label="Estimated pomodoros">
+                    <button type="submit" class="primary">Add</button>
+                </form>
+                <ul id="taskList" class="task-list" aria-live="polite" aria-label="Task list"></ul>
+                <footer class="task-foot">
+                    <button id="clearCompleted" class="ghost">Clear completed</button>
+                </footer>
+            </section>
+
+            <section class="stats" aria-label="Statistics">
+                <header><h2>Statistics</h2></header>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat"><div class="stat-val" id="statToday">0</div><div class="stat-label">Today</div></div>
+                    <div class="stat"><div class="stat-val" id="statWeek">0</div><div class="stat-label">This Week</div></div>
+                    <div class="stat"><div class="stat-val" id="statMonth">0</div><div class="stat-label">This Month</div></div>
+                    <div class="stat"><div class="stat-val" id="statTotal">0</div><div class="stat-label">Total</div></div>
+                    <div class="stat"><div class="stat-val" id="statFocus">0h</div><div class="stat-label">Focus Time</div></div>
+                    <div class="stat"><div class="stat-val" id="statStreak">0🔥</div><div class="stat-label">Streak</div></div>
+                </div>
+            </section>
+        </aside>
+    </main>
+
+    <!-- Settings Dialog -->
+    <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+        <form method="dialog" id="settingsForm">
+            <header class="dialog-title">
+                <h3 id="settingsTitle">Settings</h3>
+            </header>
+            <div class="dialog-body">
+                <div class="grid2">
+                    <label>Work (minutes)<input id="workInput" type="number" min="5" max="120" value="25"></label>
+                    <label>Short break<input id="shortInput" type="number" min="3" max="30" value="5"></label>
+                    <label>Long break<input id="longInput" type="number" min="10" max="60" value="15"></label>
+                    <label>Long break after<input id="longEveryInput" type="number" min="2" max="8" value="4"></label>
+                </div>
+                <label class="switch"><input id="autoStartBreaks" type="checkbox" checked><span>Auto-start breaks</span></label>
+                <label class="switch"><input id="autoStartWork" type="checkbox" checked><span>Auto-start work</span></label>
+                <label class="switch"><input id="desktopAlerts" type="checkbox"><span>Desktop notifications</span></label>
+            </div>
+            <footer class="dialog-actions">
+                <button value="cancel" class="ghost">Cancel</button>
+                <button id="saveSettings" value="default" class="primary">Save</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <!-- Onboarding tooltip -->
+    <div id="onboarding" class="onboarding" hidden>
+        <p><strong>Welcome!</strong> Press Space to start/pause. Add tasks on the right. Customize durations in Settings.</p>
+        <button id="dismissOnboarding" class="secondary">Got it</button>
+    </div>
+
+    <!-- Audio -->
+    <audio id="sndStart" src="assets/start.mp3" preload="auto" playsinline></audio>
+    <audio id="sndPause" src="assets/pause.mp3" preload="auto" playsinline></audio>
+    <audio id="sndWorkDone" src="assets/work_done.mp3" preload="auto" playsinline></audio>
+    <audio id="sndBreakDone" src="assets/break_done.mp3" preload="auto" playsinline></audio>
+    <audio id="sndTransition" src="assets/transition.mp3" preload="auto" playsinline></audio>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js" integrity="sha512-T4P+Jf1Q8vc3a2uZ0oZf2k7xg2M4N1f7kC2Qm9RkW5mQ1jN0+Q2tqz9p8cYtHkO2+5S7w3dVQn0q7o5QxA0QnA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="app.js" defer></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+            });
+        }
+    </script>
+</body>
+<noscript>This app requires JavaScript to run.</noscript>
+</html>
+
+
